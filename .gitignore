@@ -1,0 +1,68 @@
+# ==========================================
+# ZMK Build Outputs & Dependencies
+# ==========================================
+/build/
+/zephyr/
+/modules/
+/tools/
+*.bin
+*.hex
+*.uf2
+*.elf
+
+# West configuration
+/.west/
+
+# Python Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+
+# ==========================================
+# Agentic AI Tooling (OpenCode & Others)
+# ==========================================
+# OpenCode Local Workspaces & Configurations
+.opencode/
+*.opencode.json
+opencode.local.json
+opencode-agent.log
+
+# Cursor / Windsurf / Claude Code
+.cursor/
+.windsurf/
+.claude/
+
+# General AI Agent Logs & Execution Artifacts
+*.ai-log
+agent-history/
+
+# Environment Variables & Secrets (API Keys)
+.env
+.env.local
+.env.*.local
+*.secret
+
+# ==========================================
+# OS & Editor Specific Files
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# JetBrains / CLion
+.idea/
+
+# Vim / Emacs
+*~
+*.swp
+*.swo
