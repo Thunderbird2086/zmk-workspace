@@ -13,6 +13,7 @@ ZMK_CONFIG_BASE="/workspaces/zmk-config"
 ZMK_MODULES_BASE="/workspaces/zmk-modules"
 
 BOARD=""
+SHIELD=""
 BUILD_DIR_ARG="build"
 BUILD_YAML=0
 EXTRA_MODULES=""
@@ -259,25 +260,31 @@ PY
 }
 
 usage() {
-  echo "Usage: $0 [-b <board>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]"
+  echo "Usage: $0 [-b <board>] [-S <shield>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]"
+  echo "  -S <shield>        Pass -DSHIELD to west build (single or space-separated list)"
   echo "  -y, --build-yaml  Build all entries from the selected zmk-config build.yaml"
-  echo "Example: $0 -b holyiot_yj17120_usb -d build/mydongle -c non-nemo-zmk-config"
+  echo "Example: $0 -b holyiot_yj17120 -d build/mydongle -c non-nemo-zmk-config -e zmk-holyiot-board -S yj17120_tester"
   echo "Example: $0 -b seeeduino_xiao_ble -d build/right -c non-nemo-zmk-config -e zmk-helpers -e zmk-dongle-screen"
   echo "Example: $0 -y -d build -c non-nemo-zmk-config"
   exit 1
 }
 
-while getopts ":b:d:e:c:yh" opt; do
+while getopts ":b:S:d:e:c:yh" opt; do
   case "$opt" in
     b)
       BOARD="$OPTARG"
+      ;;
+    S)
+      SHIELD="$OPTARG"
       ;;
     d)
       BUILD_DIR_ARG="$OPTARG"
       ;;
     c)
       ZMK_CONFIG_HOST="${ZMK_CONFIG_HOST}/${OPTARG}"
-      ZMK_CONFIG_CONTAINER="${ZMK_CONFIG_BASE}/${OPTARG}"
+      # The zmk-config volume is bound directly to the repo root, so
+      # /workspaces/zmk-config == the repo root; do NOT double the path.
+      ZMK_CONFIG_CONTAINER="${ZMK_CONFIG_BASE}"
       EXTRA_MODULES="${EXTRA_MODULES};${ZMK_MODULES_BASE}/${OPTARG}"
       ;;
     e)
@@ -369,7 +376,7 @@ run_west_init
 if [[ "${BUILD_YAML}" -eq 1 ]]; then
   build_yaml_targets
 else
-  run_west_build "${BOARD}" "${BUILD_DIR_IN_CONTAINER}" "" "" ""
+  run_west_build "${BOARD}" "${BUILD_DIR_IN_CONTAINER}" "${SHIELD}" "" ""
 fi
 
 echo ""
