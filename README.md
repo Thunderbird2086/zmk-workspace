@@ -28,12 +28,13 @@ host directories, so host edits are visible inside the container at
 ## Usage
 
 ```bash
-./build-docker.sh [-b <board>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]
+./build-docker.sh [-b <board>] [-S <shield>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]
 ```
 
 | Option | Description |
 | --- | --- |
 | `-b <board>` | Target Zephyr board (e.g. `holyiot_yj17120_usb`, `seeeduino_xiao_ble`). Required unless `-y` is used |
+| `-S <shield>` | ZMK shield(s) to pass as `-DSHIELD`. Space-separated for multiple (e.g. `non_nemo_dongle dongle_screen`) |
 | `-d <build-dir>` | Build directory. Relative paths are created under `zmk/build/` (default: `build`) and removed before rebuilding |
 | `-c <config>` | Name of a ZMK config repo under `zmk-modules/` (e.g. `non-nemo-zmk-config`) |
 | `-e <module>` | Extra ZMK module under `zmk-modules/` to add (e.g. `zmk-helpers`, `zmk-dongle-screen`). Can be repeated |
@@ -51,6 +52,15 @@ Single board build:
   -e zmk-helpers -e zmk-dongle-screen
 ```
 
+Build a specific shield on a board (multiple shields may be space-separated
+within the single `-S` argument):
+
+```bash
+./build-docker.sh -b yj17120//zmk -S non_nemo_dongle \
+  -d build/non-nemo-dongle-yj17120 -c non-nemo-zmk-config \
+  -e zmk-holyiot-board -e zmk-helpers
+```
+
 Build everything defined in the config's `build.yaml` (each target goes to
 `zmk/build/<artifact-name>`):
 
@@ -66,8 +76,10 @@ Build everything defined in the config's `build.yaml` (each target goes to
    host directories, and starts (or recycles) the devcontainer for `zmk/`.
 4. Runs `west init -l app/` (if needed) and `west update` inside the container.
 5. Runs `west build -s app -d <build-dir> -b <board>` with
-   `-DZMK_CONFIG=/workspaces/zmk-config/<config>/config` and, when specified,
-   `-DZMK_EXTRA_MODULES` and `-DSHIELD`.
+   `-DZMK_CONFIG=/workspaces/zmk-config/config` (the `zmk-config` volume is
+   bound directly to the selected repo root, so no per-config segment is
+   needed) and, when specified, `-DZMK_EXTRA_MODULES`, `-DSHIELD`, and any
+   extra CMake args.
 6. Stops and removes the devcontainer on exit.
 
 On success the firmware artifacts (`.uf2` / `.bin`) are in
