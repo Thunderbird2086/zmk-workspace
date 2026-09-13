@@ -28,16 +28,18 @@ host directories, so host edits are visible inside the container at
 ## Usage
 
 ```bash
-./build-docker.sh [-b <board>] [-S <shield>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]
+./build-docker.sh [-b <board>] [-S <shield>] [-n <snippet>] [-A <cmake-args>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]
 ```
 
 | Option | Description |
 | --- | --- |
 | `-b <board>` | Target Zephyr board (e.g. `holyiot_yj17120_usb`, `seeeduino_xiao_ble`). Required unless `-y` is used |
-| `-S <shield>` | ZMK shield(s) to pass as `-DSHIELD`. Space-separated for multiple (e.g. `non_nemo_dongle dongle_screen`) |
+| `-S <shield>` | ZMK shield(s) to pass as `-DSHIELD`. Repeatable, or space-separated for multiple (e.g. `non_nemo_dongle dongle_screen`) |
+| `-n <snippet>` | Zephyr snippet(s) to pass as `-S`. Repeatable, or space-separated (e.g. `studio-rpc-usb-uart zmk-usb-logging`) |
+| `-A <cmake-args>` | Extra CMake arguments (e.g. `-DCONFIG_ZMK_STUDIO=y`). Repeatable, or space-separated. Bare `KEY=VALUE` tokens get `-D` prepended automatically |
 | `-d <build-dir>` | Build directory. Relative paths are created under `zmk/build/` (default: `build`) and removed before rebuilding |
 | `-c <config>` | Name of a ZMK config repo under `zmk-modules/` (e.g. `non-nemo-zmk-config`) |
-| `-e <module>` | Extra ZMK module under `zmk-modules/` to add (e.g. `zmk-helpers`, `zmk-dongle-screen`). Can be repeated |
+| `-e <module>` | Extra ZMK module under `zmk-modules/` to add (e.g. `zmk-helpers`, `zmk-dongle-screen`). Repeatable |
 | `-y` | Build all entries from the selected config's `build.yaml` (matrix builds) |
 | `-h` | Show usage |
 
@@ -68,6 +70,16 @@ Build everything defined in the config's `build.yaml` (each target goes to
 ./build-docker.sh -y -d build -c non-nemo-zmk-config
 ```
 
+Add Zephyr snippets and extra CMake arguments directly from the command line
+(equivalent to the `snippet` / `cmake-args` fields in a `build.yaml` entry):
+
+```bash
+./build-docker.sh -b efogtech_trackball_0 -c endgame-trackball-config \
+  -n studio-rpc-usb-uart -n zmk-usb-logging \
+  -A "-DCONFIG_ZMK_STUDIO=y" \
+  -d build/trackball
+```
+
 ### What the script does
 
 1. Validates that `zmk/`, `zmk-modules/`, and the chosen config repo exist.
@@ -78,8 +90,8 @@ Build everything defined in the config's `build.yaml` (each target goes to
 5. Runs `west build -s app -d <build-dir> -b <board>` with
    `-DZMK_CONFIG=/workspaces/zmk-config/config` (the `zmk-config` volume is
    bound directly to the selected repo root, so no per-config segment is
-   needed) and, when specified, `-DZMK_EXTRA_MODULES`, `-DSHIELD`, and any
-   extra CMake args.
+   needed) and, when specified, `-DZMK_EXTRA_MODULES`, one `-DSHIELD` per
+   shield, one `-S` per snippet, and all extra CMake args.
 6. Stops and removes the devcontainer on exit.
 
 On success the firmware artifacts (`.uf2` / `.bin`) are in
