@@ -14,6 +14,8 @@ ZMK_MODULES_BASE="/workspaces/zmk-modules"
 
 BOARD=""
 SHIELD=""
+SNIPPET=""
+CMAKE_ARGS=""
 BUILD_DIR_ARG="build"
 BUILD_YAML=0
 EXTRA_MODULES=""
@@ -165,9 +167,16 @@ run_west_build() {
   fi
 
   if [[ -n "${cmake_args}" ]]; then
-    local -a extra_cmake_args
-    read -r -a extra_cmake_args <<< "${cmake_args}"
-    build_cmd+=("${extra_cmake_args[@]}")
+    local -a cmake_token_list
+    read -r -a cmake_token_list <<< "${cmake_args}"
+    local token
+    for token in "${cmake_token_list[@]}"; do
+      # Auto-prefix bare definition tokens (e.g. CONFIG_FOO=y) with -D.
+      if [[ ! "${token}" =~ ^- && "${token}" == *=* ]]; then
+        token="-D${token}"
+      fi
+      build_cmd+=("${token}")
+    done
   fi
 
   if [[ -n "${DZMK_EXTRA_MODULES}" ]]; then
@@ -260,22 +269,31 @@ PY
 }
 
 usage() {
-  echo "Usage: $0 [-b <board>] [-S <shield>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]"
-  echo "  -S <shield>        Pass -DSHIELD to west build (single or space-separated list)"
-  echo "  -y, --build-yaml  Build all entries from the selected zmk-config build.yaml"
+  echo "Usage: $0 [-b <board>] [-S <shield>] [-n <snippet>] [-A <cmake-args>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]"
+  echo "  -S <shield>         Pass -DSHIELD to west build (single value, space-separated list for multiple shields)"
+  echo "  -n <snippet>        Pass -S to west build (single value, space-separated for multiple snippets)"
+  echo "  -A <cmake-args>     Extra CMake args (repeatable, e.g. \"-DCONFIG_ZMK_STUDIO=y\"); bare KEY=VALUE tokens get -D prepended"
+  echo "  -y, --build-yaml    Build all entries from the selected zmk-config build.yaml"
   echo "Example: $0 -b holyiot_yj17120 -d build/mydongle -c non-nemo-zmk-config -e zmk-holyiot-board -S yj17120_tester"
   echo "Example: $0 -b seeeduino_xiao_ble -d build/right -c non-nemo-zmk-config -e zmk-helpers -e zmk-dongle-screen"
+  echo "Example: $0 -b efogtech_trackball_0 -c endgame-trackball-config -n \"studio-rpc-usb-uart zmk-usb-logging\" -A \"-DCONFIG_ZMK_STUDIO=y\" -d build/trackball"
   echo "Example: $0 -y -d build -c non-nemo-zmk-config"
   exit 1
 }
 
-while getopts ":b:S:d:e:c:yh" opt; do
+while getopts ":b:S:n:A:d:e:c:yh" opt; do
   case "$opt" in
     b)
       BOARD="$OPTARG"
       ;;
     S)
       SHIELD="$OPTARG"
+      ;;
+    n)
+      SNIPPET="${SNIPPET:+${SNIPPET} }${OPTARG}"
+      ;;
+    A)
+      CMAKE_ARGS="${CMAKE_ARGS:+${CMAKE_ARGS} }${OPTARG}"
       ;;
     d)
       BUILD_DIR_ARG="$OPTARG"
@@ -376,7 +394,7 @@ run_west_init
 if [[ "${BUILD_YAML}" -eq 1 ]]; then
   build_yaml_targets
 else
-  run_west_build "${BOARD}" "${BUILD_DIR_IN_CONTAINER}" "${SHIELD}" "" ""
+  run_west_build "${BOARD}" "${BUILD_DIR_IN_CONTAINER}" "${SHIELD}" "${SNIPPET}" "${CMAKE_ARGS}"
 fi
 
 echo ""
