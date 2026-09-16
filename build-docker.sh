@@ -270,8 +270,8 @@ PY
 
 usage() {
   echo "Usage: $0 [-b <board>] [-S <shield>] [-n <snippet>] [-A <cmake-args>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]"
-  echo "  -S <shield>         Pass -DSHIELD to west build (repeatable, single or space-separated list)"
-  echo "  -n <snippet>        Pass -S to west build (repeatable, space-separated Zephyr snippets)"
+  echo "  -S <shield>         Pass -DSHIELD to west build (single value, space-separated list for multiple shields)"
+  echo "  -n <snippet>        Pass -S to west build (single value, space-separated for multiple snippets)"
   echo "  -A <cmake-args>     Extra CMake args (repeatable, e.g. \"-DCONFIG_ZMK_STUDIO=y\"); bare KEY=VALUE tokens get -D prepended"
   echo "  -y, --build-yaml    Build all entries from the selected zmk-config build.yaml"
   echo "Example: $0 -b holyiot_yj17120 -d build/mydongle -c non-nemo-zmk-config -e zmk-holyiot-board -S yj17120_tester"

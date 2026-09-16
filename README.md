@@ -34,8 +34,8 @@ host directories, so host edits are visible inside the container at
 | Option | Description |
 | --- | --- |
 | `-b <board>` | Target Zephyr board (e.g. `holyiot_yj17120_usb`, `seeeduino_xiao_ble`). Required unless `-y` is used |
-| `-S <shield>` | ZMK shield(s) to pass as `-DSHIELD`. Repeatable, or space-separated for multiple (e.g. `non_nemo_dongle dongle_screen`) |
-| `-n <snippet>` | Zephyr snippet(s) to pass as `-S`. Repeatable, or space-separated (e.g. `studio-rpc-usb-uart zmk-usb-logging`) |
+| `-S <shield>` | ZMK shield(s) to pass as a single `-DSHIELD` value (space-separated, e.g. `non_nemo_dongle dongle_screen`) |
+| `-n <snippet>` | Zephyr snippet(s) to pass as a single `-S` value (space-separated, e.g. `studio-rpc-usb-uart zmk-usb-logging`) |
 | `-A <cmake-args>` | Extra CMake arguments (e.g. `-DCONFIG_ZMK_STUDIO=y`). Repeatable, or space-separated. Bare `KEY=VALUE` tokens get `-D` prepended automatically |
 | `-d <build-dir>` | Build directory. Relative paths are created under `zmk/build/` (default: `build`) and removed before rebuilding |
 | `-c <config>` | Name of a ZMK config repo under `zmk-modules/` (e.g. `non-nemo-zmk-config`) |
