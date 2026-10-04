@@ -268,6 +268,55 @@ PY
   done
 }
 
+add_manifest_extra_modules() {
+  local manifest_path="${ZMK_CONFIG_HOST}/config/west.yml"
+
+  if [[ ! -f "${manifest_path}" ]]; then
+    echo "Error: west.yml not found at '${manifest_path}'." >&2
+    exit 1
+  fi
+
+  local module_folders
+  module_folders="$(python3 - "${manifest_path}" <<'PY'
+import os
+import sys
+import yaml
+
+with open(sys.argv[1], 'r', encoding='utf-8') as handle:
+    data = yaml.safe_load(handle) or {}
+
+manifest = data.get('manifest', {})
+projects = manifest.get('projects', [])
+if not isinstance(projects, list):
+    raise SystemExit('west.yml manifest.projects must be a list')
+
+for project in projects:
+    if not isinstance(project, dict):
+        continue
+    name = project.get('name')
+    if not name or name == 'zmk':
+        continue
+    project_path = project.get('path') or name
+    print(os.path.basename(project_path.rstrip('/')))
+PY
+)"
+
+  local module_folder
+  while IFS= read -r module_folder; do
+    [[ -z "${module_folder}" ]] && continue
+
+    local module_path="${ZMK_MODULES_BASE}/${module_folder}"
+    if [[ -d "${ZMK_MODULES_HOST}/${module_folder}" ]]; then
+      case ";${EXTRA_MODULES};" in
+        *";${module_path};"*) ;;
+        *) EXTRA_MODULES="${EXTRA_MODULES};${module_path}" ;;
+      esac
+    else
+      echo "Warning: west.yml project '${module_folder}' has no checkout at '${ZMK_MODULES_HOST}/${module_folder}'; skipping it." >&2
+    fi
+  done <<< "${module_folders}"
+}
+
 usage() {
   echo "Usage: $0 [-b <board>] [-S <shield>] [-n <snippet>] [-A <cmake-args>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]"
   echo "  -S <shield>         Pass -DSHIELD to west build (single value, space-separated list for multiple shields)"
@@ -343,6 +392,10 @@ fi
 if [[ ! -d "${ZMK_MODULES_HOST}" ]]; then
   echo "Error: ZMK modules directory not found at '${ZMK_MODULES_HOST}'." >&2
   exit 1
+fi
+
+if [[ "${BUILD_YAML}" -eq 1 ]]; then
+  add_manifest_extra_modules
 fi
 
 if [[ "${BUILD_DIR_ARG}" == /* ]]; then
