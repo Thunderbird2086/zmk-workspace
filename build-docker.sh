@@ -268,6 +268,132 @@ PY
   done
 }
 
+add_manifest_extra_modules() {
+  local manifest_path="${ZMK_CONFIG_HOST}/config/west.yml"
+
+  if [[ ! -f "${manifest_path}" ]]; then
+    echo "Error: west.yml not found at '${manifest_path}'." >&2
+    exit 1
+  fi
+
+  local missing_projects
+  missing_projects="$(python3 - "${manifest_path}" "${ZMK_MODULES_HOST}" <<'PY'
+import os
+import posixpath
+import sys
+import yaml
+
+manifest_path, modules_root = sys.argv[1:]
+with open(manifest_path, 'r', encoding='utf-8') as handle:
+    data = yaml.safe_load(handle) or {}
+
+manifest = data.get('manifest', {})
+for project in manifest.get('projects', []):
+    if not isinstance(project, dict) or not project.get('name') or project['name'] == 'zmk':
+        continue
+    module_path = posixpath.normpath(project.get('path') or project['name'])
+    target_path = os.path.join(modules_root, *module_path.split('/'))
+    if not os.path.isdir(target_path):
+        print(f"{project['name']} -> {module_path}")
+PY
+  )"
+
+  local install_missing=0
+  if [[ -n "${missing_projects}" ]]; then
+    printf 'Missing west.yml module checkouts:\n%s\n' "${missing_projects}" >&2
+    local install_answer=""
+    if read -r -p "Install missing modules at their west.yml revisions? [y/N] " install_answer; then
+      case "${install_answer}" in
+        y|Y|yes|YES|Yes)
+          install_missing=1
+          ;;
+        *)
+          echo "Continuing with available module checkouts." >&2
+          ;;
+      esac
+    else
+      echo "No interactive input; continuing without missing modules." >&2
+    fi
+  fi
+
+  local module_paths
+  module_paths="$(ZMK_INSTALL_MISSING="${install_missing}" python3 - "${manifest_path}" "${ZMK_MODULES_HOST}" <<'PY'
+import os
+import posixpath
+import subprocess
+import sys
+import yaml
+
+manifest_path, modules_root = sys.argv[1:]
+with open(manifest_path, 'r', encoding='utf-8') as handle:
+    data = yaml.safe_load(handle) or {}
+
+manifest = data.get('manifest', {})
+projects = manifest.get('projects', [])
+remotes = manifest.get('remotes', [])
+if not isinstance(projects, list) or not isinstance(remotes, list):
+    raise SystemExit('west.yml manifest.projects and manifest.remotes must be lists')
+
+remote_by_name = {remote.get('name'): remote for remote in remotes if isinstance(remote, dict)}
+modules = []
+for project in projects:
+    if not isinstance(project, dict):
+        continue
+    name = project.get('name')
+    if not name or name == 'zmk':
+        continue
+    module_path = project.get('path') or name
+    module_path = posixpath.normpath(module_path)
+    if module_path.startswith('../') or module_path == '..' or module_path.startswith('/'):
+        raise SystemExit(f"Unsafe module path in west.yml: {module_path}")
+    target_path = os.path.join(modules_root, *module_path.split('/'))
+    if os.path.isdir(target_path):
+        modules.append(module_path)
+    else:
+        modules.append((module_path, project, target_path))
+
+missing = [module for module in modules if isinstance(module, tuple)]
+if missing and os.environ.get('ZMK_INSTALL_MISSING') == '1':
+  for module_path, project, target_path in missing:
+    url = project.get('url')
+    if not url:
+      remote = remote_by_name.get(project.get('remote'), {})
+      base = remote.get('url-base') or remote.get('url')
+      repo_path = project.get('repo-path') or project.get('name')
+      if not base or not repo_path:
+        raise SystemExit(f"Cannot resolve remote URL for west.yml project '{project.get('name')}'")
+      url = base.rstrip('/') + '/' + repo_path.lstrip('/')
+
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    print(f"Installing {project.get('name')} ({project.get('revision') or 'default revision'})...", file=sys.stderr)
+    subprocess.run(['git', 'clone', '--no-checkout', url, target_path], check=True)
+    revision = project.get('revision')
+    fetch_args = ['git', '-C', target_path, 'fetch', '--quiet', 'origin']
+    if revision:
+      fetch_args.append(revision)
+    subprocess.run(fetch_args, check=True)
+    subprocess.run(['git', '-C', target_path, 'checkout', '--quiet', '--detach', 'FETCH_HEAD'], check=True)
+    modules.append(module_path)
+
+for module in modules:
+    if isinstance(module, tuple):
+        continue
+    print(module)
+PY
+  )"
+
+  local module_relative_path
+  while IFS= read -r module_relative_path; do
+    [[ -z "${module_relative_path}" ]] && continue
+
+    local module_path="${ZMK_MODULES_BASE}/${module_relative_path}"
+    case ";${EXTRA_MODULES};" in
+      *";${module_path};"*) ;;
+      *) EXTRA_MODULES="${EXTRA_MODULES};${module_path}" ;;
+    esac
+  done <<< "${module_paths}"
+}
+
 usage() {
   echo "Usage: $0 [-b <board>] [-S <shield>] [-n <snippet>] [-A <cmake-args>] [-d <build-dir>] [-c <zmk-config-repository>] [-e <extra-module>] [-y]"
   echo "  -S <shield>         Pass -DSHIELD to west build (single value, space-separated list for multiple shields)"
@@ -343,6 +469,10 @@ fi
 if [[ ! -d "${ZMK_MODULES_HOST}" ]]; then
   echo "Error: ZMK modules directory not found at '${ZMK_MODULES_HOST}'." >&2
   exit 1
+fi
+
+if [[ "${BUILD_YAML}" -eq 1 ]]; then
+  add_manifest_extra_modules
 fi
 
 if [[ "${BUILD_DIR_ARG}" == /* ]]; then
